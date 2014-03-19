@@ -831,7 +831,8 @@ static void pri_update_mms_context_settings(struct pri_context *ctx)
 
 	DBG("proxy %s port %u", ctx->proxy_host, ctx->proxy_port);
 
-	pri_set_ipv4_addr(gc->interface, settings->ipv4->ip);
+	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS)
+		pri_set_ipv4_addr(gc->interface, settings->ipv4->ip);
 
 	if (ctx->proxy_host)
 		pri_setproxy(gc->interface, ctx->proxy_host);
@@ -1162,7 +1163,8 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
 	if (gc->interface != NULL) {
 		pri_ifupdown(gc->interface, TRUE);
 
-		if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS &&
+		if ((ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
+			(ctx->message_proxy && strlen(ctx->message_proxy) > 0)) &&
 				gc->settings->ipv4)
 			pri_update_mms_context_settings(ctx);
 
