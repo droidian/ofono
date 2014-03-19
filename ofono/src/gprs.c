@@ -921,7 +921,8 @@ static void pri_reset_context_properties(struct pri_context *ctx,
 			gprs_auth_method_to_string(ctx->context.auth_method));
 	}
 
-	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
+	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
+		ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 		if (pri_str_update(ctx->message_proxy, ap->message_proxy,
 				sizeof(ctx->message_proxy))) {
 			changed = TRUE;
@@ -987,7 +988,8 @@ static gboolean pri_deactivation_required(struct pri_context *ctx,
 	if (pri_str_changed(ctx->context.password, ap->password))
 		return TRUE;
 
-	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
+	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
+		ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
 		if (pri_str_changed(ctx->message_proxy, ap->message_proxy))
 			return TRUE;
 
