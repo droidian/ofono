@@ -21,7 +21,7 @@ CONFIGURE_FLAGS := \
     --with-systemdunitdir=/lib/systemd/system
 
 %:
-	dh $@ --parallel --with=autoreconf,systemd --sourcedirectory=ofono
+	dh $@ --with=autoreconf,systemd --sourcedirectory=ofono
 
 override_dh_auto_configure:
 	dh_auto_configure -- $(CONFIGURE_FLAGS)

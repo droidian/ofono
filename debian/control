@@ -1,12 +1,10 @@
 Source: ofono
 Section: admin
 Priority: optional
-Maintainer: UBports developers
+Maintainer: TheKit <thekit@disroot.org>
 XSBC-Original-Maintainer: Debian Telepathy maintainers <pkg-telepathy-maintainers@lists.alioth.debian.org>
-Uploaders: TheKit <nekit1000@gmail.com>
-Build-Depends: debhelper (>= 9),
-               dh-autoreconf,
-               dh-systemd,
+Uploaders: TheKit <thekit@disroot.org>
+Build-Depends: debhelper (>=10),
                libtool,
                libglib2.0-dev (>= 2.22),
                libdbus-glib-1-dev,
