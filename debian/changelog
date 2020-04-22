@@ -1,8 +1,15 @@
-ofono (1.21+ubports1) xenial; urgency=medium
+ofono (1.23+gemian1) buster; urgency=medium
 
-  * Port SailfishOS ofono fork to UBPorts
+  * Rebase on Sailfish upstream
 
- -- TheKit <nekit1000@gmail.com>  Sun, 10 Mar 2019 20:33:57 +0200
+ -- TheKit <thekit@disroot.org>  Thu, 23 Apr 2020 00:24:04 +0200
+
+ofono (1.21+gemian3) buster; urgency=medium
+
+  * Branched for Gemian
+  * Updated to sailfish ofono branch
+
+ -- Adam Boardman <adamboardman@gmail.com>  Thu, 17 May 2018 15:04:48 +0100
 
 ofono (1.21-1) unstable; urgency=medium
 
