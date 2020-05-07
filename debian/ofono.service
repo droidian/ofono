@@ -7,7 +7,7 @@ After=dbus.service
 [Service]
 Restart=on-failure
 BusName=org.ofono
-ExecStart=/usr/sbin/ofonod -P ril --nodetach
+ExecStart=/usr/sbin/ofonod --nodetach
 
 [Install]
 WantedBy=multi-user.target
