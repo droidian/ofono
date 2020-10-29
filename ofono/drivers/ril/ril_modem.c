@@ -218,22 +218,21 @@ static void ril_modem_schedule_online_check(struct ril_modem_data *md)
 static void ril_modem_update_radio_settings(struct ril_modem_data *md)
 {
 	struct ril_modem *m = &md->modem;
-	if (m->radio->state == RADIO_STATE_ON && md->watch->imsi) {
+	struct ofono_radio_settings *rs = ril_modem_radio_settings(m);
+
+	if (md->watch->imsi) {
 		/* radio-settings.c assumes that IMSI is available */
-		if (!ril_modem_radio_settings(m)) {
+		if (!rs) {
 			DBG_(md, "initializing radio settings interface");
 			ofono_radio_settings_create(m->ofono, 0,
 						RILMODEM_DRIVER, md);
 		}
+	} else if (rs) {
+		DBG_(md, "removing radio settings interface");
+		ofono_radio_settings_remove(rs);
 	} else {
 		/* ofono core may remove radio settings atom internally */
-		struct ofono_radio_settings *rs = ril_modem_radio_settings(m);
-		if (rs) {
-			DBG_(md, "removing radio settings interface");
-			ofono_radio_settings_remove(rs);
-		} else {
-			DBG_(md, "radio settings interface is already gone");
-		}
+		DBG_(md, "radio settings interface is already gone");
 	}
 }
 
@@ -242,7 +241,6 @@ static void ril_modem_radio_state_cb(struct ril_radio *radio, void *data)
 	struct ril_modem_data *md = data;
 
 	GASSERT(md->modem.radio == radio);
-	ril_modem_update_radio_settings(md);
 	ril_modem_update_online_state(md);
 }
 
@@ -423,7 +421,9 @@ static void ril_modem_remove(struct ofono_modem *ofono)
 	ofono_modem_set_data(ofono, NULL);
 
 	ril_radio_remove_handler(modem->radio, md->radio_state_event_id);
+	ril_radio_set_online(modem->radio, FALSE);
 	ril_radio_power_off(modem->radio, RADIO_POWER_TAG(md));
+	ril_radio_set_online(modem->radio, FALSE);
 	ril_radio_unref(modem->radio);
 	ril_sim_settings_unref(modem->sim_settings);
 

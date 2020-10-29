@@ -94,11 +94,14 @@
 #define RILMODEM_DEFAULT_LEGACY_IMEI_QUERY FALSE
 #define RILMODEM_DEFAULT_RADIO_POWER_CYCLE TRUE
 #define RILMODEM_DEFAULT_CONFIRM_RADIO_POWER_ON TRUE
+#define RILMODEM_DEFAULT_REPLACE_STRANGE_OPER FALSE
 #define RILMODEM_DEFAULT_NETWORK_SELECTION_MANUAL_0 TRUE
 #define RILMODEM_DEFAULT_FORCE_GSM_WHEN_RADIO_OFF TRUE
 #define RILMODEM_DEFAULT_USE_DATA_PROFILES FALSE
 #define RILMODEM_DEFAULT_MMS_DATA_PROFILE_ID RIL_DATA_PROFILE_IMS
 #define RILMODEM_DEFAULT_SLOT_FLAGS SAILFISH_SLOT_NO_FLAGS
+#define RILMODEM_DEFAULT_CELL_INFO_INTERVAL_SHORT_MS (2000) /* 2 sec */
+#define RILMODEM_DEFAULT_CELL_INFO_INTERVAL_LONG_MS  (30000) /* 30 sec */
 
 /* RIL socket transport name and parameters */
 #define RIL_TRANSPORT_MODEM                 "modem"
@@ -151,11 +154,14 @@
 #define RILCONF_RADIO_POWER_CYCLE           "radioPowerCycle"
 #define RILCONF_CONFIRM_RADIO_POWER_ON      "confirmRadioPowerOn"
 #define RILCONF_SINGLE_DATA_CONTEXT         "singleDataContext"
+#define RILCONF_REPLACE_STRANGE_OPER        "replaceStrangeOperatorNames"
 #define RILCONF_NETWORK_SELECTION_MANUAL_0  "networkSelectionManual0"
 #define RILCONF_FORCE_GSM_WHEN_RADIO_OFF    "forceGsmWhenRadioOff"
 #define RILCONF_USE_DATA_PROFILES           "useDataProfiles"
 #define RILCONF_MMS_DATA_PROFILE_ID         "mmsDataProfileId"
 #define RILCONF_DEVMON                      "deviceStateTracking"
+#define RILCONF_CELL_INFO_INTERVAL_SHORT_MS "cellInfoIntervalShortMs"
+#define RILCONF_CELL_INFO_INTERVAL_LONG_MS  "cellInfoIntervalLongMs"
 
 /* Modem error ids */
 #define RIL_ERROR_ID_RILD_RESTART           "rild-restart"
@@ -228,6 +234,7 @@ typedef struct sailfish_slot_impl {
 	struct ril_modem *modem;
 	struct ril_radio *radio;
 	struct ril_radio_caps *caps;
+	struct ril_radio_caps_request *caps_req;
 	struct ril_network *network;
 	struct ril_sim_card *sim_card;
 	struct ril_sim_settings *sim_settings;
@@ -364,6 +371,7 @@ static void ril_plugin_remove_slot_handler(ril_slot *slot, int id)
 static void ril_plugin_shutdown_slot(ril_slot *slot, gboolean kill_io)
 {
 	if (slot->modem) {
+		ril_data_allow(slot->data, RIL_DATA_ROLE_NONE);
 		ril_modem_delete(slot->modem);
 		/* The above call is expected to result in
 		 * ril_plugin_modem_removed getting called
@@ -383,12 +391,16 @@ static void ril_plugin_shutdown_slot(ril_slot *slot, gboolean kill_io)
 		}
 
 		if (slot->cell_info) {
+			sailfish_manager_set_cell_info(slot->handle, NULL);
 			sailfish_cell_info_unref(slot->cell_info);
 			slot->cell_info = NULL;
 		}
 
 		if (slot->caps) {
-			ril_radio_caps_unref(slot->caps);
+			ril_network_set_radio_caps(slot->network, NULL);
+			ril_radio_caps_request_free(slot->caps_req);
+			ril_radio_caps_drop(slot->caps);
+			slot->caps_req = NULL;
 			slot->caps = NULL;
 		}
 
@@ -902,7 +914,7 @@ static void ril_plugin_radio_caps_cb(const struct ril_radio_capability *cap,
 			plugin->caps_manager = ril_radio_caps_manager_new
 				(plugin->data_manager);
 			plugin->caps_manager_event_id =
-				ril_radio_caps_manager_add_aborted_handler(
+				ril_radio_caps_manager_add_tx_aborted_handler(
 					plugin->caps_manager,
 					ril_plugin_caps_switch_aborted,
 					plugin);
@@ -910,9 +922,10 @@ static void ril_plugin_radio_caps_cb(const struct ril_radio_capability *cap,
 
 		GASSERT(!slot->caps);
 		slot->caps = ril_radio_caps_new(plugin->caps_manager,
-			ril_plugin_log_prefix(slot), slot->io, slot->data,
-			slot->radio, slot->sim_card, slot->network,
-			&slot->config, cap);
+			ril_plugin_log_prefix(slot), slot->io, slot->watch,
+			slot->data, slot->radio, slot->sim_card,
+			slot->sim_settings, &slot->config, cap);
+		ril_network_set_radio_caps(slot->network, slot->caps);
 	}
 }
 
@@ -1040,13 +1053,13 @@ static void ril_plugin_slot_connected(ril_slot *slot)
 				slot->path, slot->config.techs, slot->imei,
 				slot->imeisv, ril_plugin_sim_state(slot),
 				slot->slot_flags);
-		sailfish_manager_set_cell_info(slot->handle, slot->cell_info);
 		grilio_channel_set_enabled(slot->io, slot->handle->enabled);
 
 		/* Check if this was the last slot we were waiting for */
 		ril_plugin_check_if_started(plugin);
 	}
 
+	sailfish_manager_set_cell_info(slot->handle, slot->cell_info);
 	ril_plugin_check_modem(slot);
 	ril_plugin_check_ready(slot);
 }
@@ -1062,8 +1075,11 @@ static void ril_plugin_slot_connected_cb(GRilIoChannel *io, void *user_data)
 static void ril_plugin_init_io(ril_slot *slot)
 {
 	if (!slot->io) {
-		slot->io = grilio_channel_new(ofono_ril_transport_connect
-			(slot->transport_name, slot->transport_params));
+		struct grilio_transport *transport =
+			ofono_ril_transport_connect(slot->transport_name,
+						slot->transport_params);
+
+		slot->io = grilio_channel_new(transport);
 		if (slot->io) {
 			ril_debug_trace_update(slot);
 			ril_debug_dump_update(slot);
@@ -1095,6 +1111,7 @@ static void ril_plugin_init_io(ril_slot *slot)
 						slot);
 			}
 		}
+		grilio_transport_unref(transport);
 	}
 
 	if (!slot->io) {
@@ -1140,6 +1157,8 @@ static void ril_plugin_slot_modem_changed(struct ofono_watch *w,
 
 		slot->modem = NULL;
 		ril_data_allow(slot->data, RIL_DATA_ROLE_NONE);
+		ril_radio_caps_request_free(slot->caps_req);
+		slot->caps_req = NULL;
 	}
 }
 
@@ -1208,12 +1227,17 @@ static ril_slot *ril_plugin_slot_new_take(char *transport,
 	config->enable_stk = RILMODEM_DEFAULT_ENABLE_STK;
 	config->query_available_band_mode =
 		RILMODEM_DEFAULT_QUERY_AVAILABLE_BAND_MODE;
+	config->replace_strange_oper = RILMODEM_DEFAULT_REPLACE_STRANGE_OPER;
 	config->network_selection_manual_0 =
 		RILMODEM_DEFAULT_NETWORK_SELECTION_MANUAL_0;
 	config->force_gsm_when_radio_off =
 		RILMODEM_DEFAULT_FORCE_GSM_WHEN_RADIO_OFF;
 	config->use_data_profiles = RILMODEM_DEFAULT_USE_DATA_PROFILES;
 	config->mms_data_profile_id = RILMODEM_DEFAULT_MMS_DATA_PROFILE_ID;
+	config->cell_info_interval_short_ms =
+				RILMODEM_DEFAULT_CELL_INFO_INTERVAL_SHORT_MS;
+	config->cell_info_interval_long_ms =
+				RILMODEM_DEFAULT_CELL_INFO_INTERVAL_LONG_MS;
 	slot->timeout = RILMODEM_DEFAULT_TIMEOUT;
 	slot->sim_flags = RILMODEM_DEFAULT_SIM_FLAGS;
 	slot->slot_flags = RILMODEM_DEFAULT_SLOT_FLAGS;
@@ -1225,8 +1249,7 @@ static ril_slot *ril_plugin_slot_new_take(char *transport,
 		RILMODEM_DEFAULT_DATA_CALL_RETRY_LIMIT;
 	slot->data_opt.data_call_retry_delay_ms =
 		RILMODEM_DEFAULT_DATA_CALL_RETRY_DELAY;
-
-	slot->devmon = ril_devmon_auto_new();
+	slot->devmon = ril_devmon_auto_new(config);
 	slot->watch = ofono_watch_new(dbus_path);
 	slot->watch_event_id[WATCH_EVENT_MODEM] =
 		ofono_watch_add_modem_changed_handler(slot->watch,
@@ -1248,6 +1271,7 @@ static void ril_plugin_slot_apply_vendor_defaults(ril_slot *slot)
 		defaults.empty_pin_query = config->empty_pin_query;
 		defaults.mms_data_profile_id = config->mms_data_profile_id;
 		defaults.use_data_profiles = config->use_data_profiles;
+		defaults.replace_strange_oper = config->replace_strange_oper;
 		defaults.force_gsm_when_radio_off =
 			config->force_gsm_when_radio_off;
 		defaults.query_available_band_mode =
@@ -1260,6 +1284,7 @@ static void ril_plugin_slot_apply_vendor_defaults(ril_slot *slot)
 		config->empty_pin_query = defaults.empty_pin_query;
 		config->use_data_profiles = defaults.use_data_profiles;
 		config->mms_data_profile_id = defaults.mms_data_profile_id;
+		config->replace_strange_oper = defaults.replace_strange_oper;
 		config->force_gsm_when_radio_off =
 			defaults.force_gsm_when_radio_off;
 		config->query_available_band_mode =
@@ -1481,6 +1506,14 @@ static ril_slot *ril_plugin_parse_config_group(GKeyFile *file,
 					&config->enable_stk)) {
 		DBG("%s: " RILCONF_ENABLE_STK " %s", group,
 				config->enable_stk ? "yes" : "no");
+	}
+
+	/* replaceStrangeOperatorNames */
+	if (ril_config_get_boolean(file, group,
+					RILCONF_REPLACE_STRANGE_OPER,
+					&config->replace_strange_oper)) {
+		DBG("%s: " RILCONF_REPLACE_STRANGE_OPER " %s", group,
+			config->replace_strange_oper ? "yes" : "no");
 	}
 
 	/* networkSelectionManual0 */
@@ -1716,6 +1749,26 @@ static ril_slot *ril_plugin_parse_config_group(GKeyFile *file,
 				slot->legacy_imei_query ? "on" : "off");
 	}
 
+	/* cellInfoIntervalShortMs */
+	if (ril_config_get_integer(file, group,
+				RILCONF_CELL_INFO_INTERVAL_SHORT_MS,
+				&config->cell_info_interval_short_ms)) {
+		DBG("%s: " RILCONF_CELL_INFO_INTERVAL_SHORT_MS " %d", group,
+					config->cell_info_interval_short_ms);
+	}
+
+	/* cellInfoIntervalLongMs */
+	if (ril_config_get_integer(file, group,
+				RILCONF_CELL_INFO_INTERVAL_LONG_MS,
+				&config->cell_info_interval_long_ms)) {
+		DBG("%s: " RILCONF_CELL_INFO_INTERVAL_LONG_MS " %d",
+				group, config->cell_info_interval_long_ms);
+	}
+
+	/* Replace devmon with a new one with applied settings */
+	ril_devmon_free(slot->devmon);
+	slot->devmon = NULL;
+
 	/* deviceStateTracking */
 	if (ril_config_get_mask(file, group, RILCONF_DEVMON, &ival,
 				"ds", RIL_DEVMON_DS,
@@ -1724,11 +1777,16 @@ static ril_slot *ril_plugin_parse_config_group(GKeyFile *file,
 		int n = 0;
 		struct ril_devmon *devmon[3];
 
-		if (ival & RIL_DEVMON_DS) devmon[n++] = ril_devmon_ds_new();
-		if (ival & RIL_DEVMON_SS) devmon[n++] = ril_devmon_ss_new();
-		if (ival & RIL_DEVMON_UR) devmon[n++] = ril_devmon_ur_new();
+		if (ival & RIL_DEVMON_DS) {
+			devmon[n++] = ril_devmon_ds_new(config);
+		}
+		if (ival & RIL_DEVMON_SS) {
+			devmon[n++] = ril_devmon_ss_new(config);
+		}
+		if (ival & RIL_DEVMON_UR) {
+			devmon[n++] = ril_devmon_ur_new(config);
+		}
 		DBG("%s: " RILCONF_DEVMON " 0x%x", group, ival);
-		ril_devmon_free(slot->devmon);
 		slot->devmon = ril_devmon_combine(devmon, n);
 	} else {
 		/* Try special values */
@@ -1736,13 +1794,14 @@ static ril_slot *ril_plugin_parse_config_group(GKeyFile *file,
 		if (sval) {
 			if (!g_ascii_strcasecmp(sval, "none")) {
 				DBG("%s: " RILCONF_DEVMON " %s", group, sval);
-				ril_devmon_free(slot->devmon);
-				slot->devmon = NULL;
 			} else if (!g_ascii_strcasecmp(sval, "auto")) {
 				DBG("%s: " RILCONF_DEVMON " %s", group, sval);
-				/* This is the default */
+				slot->devmon = ril_devmon_auto_new(config);
 			}
 			g_free(sval);
+		} else {
+			/* This is the default */
+			slot->devmon = ril_devmon_auto_new(config);
 		}
 	}
 
@@ -2173,10 +2232,24 @@ static void ril_plugin_manager_free(ril_plugin *plugin)
 
 static void ril_slot_set_data_role(ril_slot *slot, enum sailfish_data_role r)
 {
-	ril_data_allow(slot->data,
+	enum ril_data_role role =
 		(r == SAILFISH_DATA_ROLE_INTERNET) ? RIL_DATA_ROLE_INTERNET :
 		(r == SAILFISH_DATA_ROLE_MMS) ? RIL_DATA_ROLE_MMS :
-		RIL_DATA_ROLE_NONE);
+		RIL_DATA_ROLE_NONE;
+	ril_data_allow(slot->data, role);
+	ril_radio_caps_request_free(slot->caps_req);
+	if (role == RIL_DATA_ROLE_NONE) {
+		slot->caps_req = NULL;
+	} else {
+		const enum ofono_radio_access_mode mode =
+			(r == SAILFISH_DATA_ROLE_MMS) ?
+				OFONO_RADIO_ACCESS_MODE_GSM :
+				__ofono_radio_access_max_mode
+						(slot->sim_settings->techs);
+
+		slot->caps_req = ril_radio_caps_request_new
+			(slot->caps, mode, role);
+	}
 }
 
 static void ril_slot_enabled_changed(struct sailfish_slot_impl *s)

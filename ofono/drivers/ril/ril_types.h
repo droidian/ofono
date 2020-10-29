@@ -24,6 +24,7 @@
 #include <grilio_types.h>
 #include <gutil_macros.h>
 
+struct ofono_watch;
 struct ofono_modem;
 struct ofono_sim;
 
@@ -49,6 +50,12 @@ struct ril_network;
 struct ril_sim_card;
 struct ril_vendor;
 
+enum ril_data_role {
+	RIL_DATA_ROLE_NONE,    /* Mobile data not required */
+	RIL_DATA_ROLE_MMS,     /* Data is needed at any speed */
+	RIL_DATA_ROLE_INTERNET /* Data is needed at full speed */
+};
+
 struct ril_slot_config {
 	guint slot;
 	enum ofono_radio_access_mode techs;
@@ -65,12 +72,15 @@ struct ril_slot_config {
 	gboolean enable_voicecall;
 	gboolean enable_cbs;
 	gboolean enable_stk;
+	gboolean replace_strange_oper;
 	gboolean network_selection_manual_0;
 	gboolean force_gsm_when_radio_off;
 	gboolean use_data_profiles;
 	guint mms_data_profile_id;
 	GUtilInts *local_hangup_reasons;
 	GUtilInts *remote_hangup_reasons;
+	int cell_info_interval_short_ms;
+	int cell_info_interval_long_ms;
 };
 
 #endif /* RIL_TYPES_H */
