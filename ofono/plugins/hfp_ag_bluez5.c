@@ -495,8 +495,6 @@ static void hfp_ag_enable(DBusConnection *conn)
 	connection_hash = g_hash_table_new_full(g_str_hash, g_str_equal,
 	                                        g_free, connection_destroy);
 
-	ofono_handsfree_audio_ref();
-
 	hfp_ag_enabled = TRUE;
 }
 
@@ -525,7 +523,6 @@ static void hfp_ag_disable(DBusConnection *conn)
 		g_dbus_unregister_interface(conn, HFP_AG_EXT_PROFILE_PATH,
 		                            BLUEZ_PROFILE_INTERFACE);
 		ofono_handsfree_card_driver_unregister(&hfp_ag_driver);
-		ofono_handsfree_audio_unref();
 	}
 
 	hfp_ag_enabled = FALSE;
@@ -545,13 +542,14 @@ static int hfp_ag_init(void)
 {
 	DBusConnection *conn = ofono_dbus_get_connection();
 
-	hfp_ag_enable(conn);
-
+	/* g_dbus_add_service_watch immediately checks for bluetooth service
+	 * and calls connect callback if the service exists. */
 	service_watch_id = g_dbus_add_service_watch(conn, "org.bluez",
 	                                            bluez_connect_cb,
 	                                            bluez_disconnect_cb,
 	                                            NULL, NULL);
 
+	ofono_handsfree_audio_ref();
 	return 0;
 }
 
@@ -565,6 +563,7 @@ static void hfp_ag_exit(void)
 	}
 
 	hfp_ag_disable(conn);
+	ofono_handsfree_audio_unref();
 }
 
 OFONO_PLUGIN_DEFINE(hfp_ag_bluez5, "Hands-Free Audio Gateway Profile Plugins",
