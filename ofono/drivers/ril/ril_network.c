@@ -1,7 +1,7 @@
 /*
  *  oFono - Open Source Telephony - RIL-based devices
  *
- *  Copyright (C) 2015-2020 Jolla Ltd.
+ *  Copyright (C) 2015-2021 Jolla Ltd.
  *  Copyright (C) 2019-2020 Open Mobile Platform LLC.
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -444,14 +444,13 @@ static guint ril_network_poll_and_retry(struct ril_network *self, guint id,
 {
 	struct ril_network_priv *priv = self->priv;
 
-	if (id) {
-		/* Retry right away, don't wait for retry timeout to expire */
-		grilio_channel_retry_request(priv->io, id);
-	} else {
+	/* Don't wait for retry timeout to expire */
+	if (!id || !grilio_channel_retry_request(priv->io, id)) {
 		GRilIoRequest *req = grilio_request_new();
 
 		grilio_request_set_retry(req, RIL_RETRY_SECS*1000, -1);
 		grilio_request_set_retry_func(req, ril_network_retry);
+		grilio_queue_cancel_request(priv->q, id, FALSE);
 		id = grilio_queue_send_request_full(priv->q, req, code, fn,
 								NULL, self);
 		grilio_request_unref(req);
@@ -697,7 +696,7 @@ struct ril_network_data_profile *ril_network_data_profile_new
 	ptr += G_ALIGN8(sizeof(*profile));
 
 	profile->profile_id = profile_id;
-	profile->type = RIL_PROFILE_3GPP;
+	profile->type = RIL_PROFILE_COMMON;
 	profile->auth_method = auth_method;
 	profile->proto = context->proto;
 	profile->enabled = TRUE;
@@ -826,6 +825,9 @@ static void ril_network_check_data_profiles(struct ril_network *self)
 		const struct ofono_gprs_primary_context* mms =
 			ofono_gprs_context_settings_by_type(gprs,
 				OFONO_GPRS_CONTEXT_TYPE_MMS);
+		const struct ofono_gprs_primary_context* ims =
+			ofono_gprs_context_settings_by_type(gprs,
+				OFONO_GPRS_CONTEXT_TYPE_IMS);
 		GSList *l = NULL;
 
 		if (internet) {
@@ -840,6 +842,12 @@ static void ril_network_check_data_profiles(struct ril_network *self)
 			l = g_slist_append(l,
 				ril_network_data_profile_new(mms,
 					priv->mms_data_profile_id));
+		}
+		if (ims) {
+			DBG_(self, "ims apn \"%s\"", ims->apn);
+			l = g_slist_append(l,
+				ril_network_data_profile_new(ims,
+					RIL_DATA_PROFILE_IMS));
 		}
 
 		if (ril_network_data_profiles_equal(priv->data_profiles, l)) {
