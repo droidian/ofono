@@ -729,7 +729,7 @@ gboolean is_valid_apn(const char *apn)
 		if (apn[i] == '-')
 			continue;
 
-		if (apn[i] == '.' && (i - last_period) > 1) {
+		if (apn[i] == '.' && (i - last_period) > 0) {
 			last_period = i;
 			continue;
 		}
