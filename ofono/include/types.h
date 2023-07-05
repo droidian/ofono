@@ -3,7 +3,7 @@
  *  oFono - Open Source Telephony
  *
  *  Copyright (C) 2008-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2015-2021  Jolla Ltd.
+ *  Copyright (C) 2015-2022  Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -36,6 +36,8 @@ extern "C" {
 #endif
 
 typedef int		ofono_bool_t;
+
+struct ofono_modem;
 
 /* MCC is always three digits. MNC is either two or three digits */
 #define OFONO_MAX_MCC_LENGTH 3
@@ -94,6 +96,14 @@ enum ofono_call_direction {
 	OFONO_CALL_DIRECTION_MOBILE_TERMINATED = 1
 };
 
+/* 27.007 Section 7.18 <mode> */
+enum ofono_call_mode {
+	OFONO_CALL_MODE_VOICE = 0,
+	OFONO_CALL_MODE_DATA = 1,
+	OFONO_CALL_MODE_FAX = 3,
+	OFONO_CALL_MODE_UNKNOWN = 9
+}; /* Since mer/1.25+git5 */
+
 enum ofono_sms_charset {
 	OFONO_SMS_CHARSET_7BIT = 0,
 	OFONO_SMS_CHARSET_8BIT = 1,
@@ -146,7 +156,7 @@ struct ofono_cdma_phone_number {
 
 struct ofono_call {
 	unsigned int id;
-	int type;
+	enum ofono_call_mode type;
 	enum ofono_call_direction direction;
 	enum ofono_call_status status;
 	struct ofono_phone_number phone_number;
@@ -171,6 +181,28 @@ struct ofono_network_time {
 
 struct ofono_uuid {
 	unsigned char uuid[OFONO_SHA1_UUID_LEN];
+};
+
+/*
+ * ETSI 123.003, Section 9.1:
+ * the APN has, after encoding as defined in the paragraph below, a maximum
+ * length of 100 octets
+ */
+#define OFONO_GPRS_MAX_APN_LENGTH 100
+#define OFONO_GPRS_MAX_USERNAME_LENGTH 63
+#define OFONO_GPRS_MAX_PASSWORD_LENGTH 255
+
+enum ofono_gprs_proto {
+	OFONO_GPRS_PROTO_IP = 0,
+	OFONO_GPRS_PROTO_IPV6,
+	OFONO_GPRS_PROTO_IPV4V6,
+};
+
+enum ofono_gprs_auth_method {
+	OFONO_GPRS_AUTH_METHOD_ANY = 0,
+	OFONO_GPRS_AUTH_METHOD_NONE,
+	OFONO_GPRS_AUTH_METHOD_CHAP,
+	OFONO_GPRS_AUTH_METHOD_PAP
 };
 
 const char *ofono_uuid_to_str(const struct ofono_uuid *uuid);

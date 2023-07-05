@@ -225,8 +225,6 @@ gboolean __ofono_modem_remove_atom_watch(struct ofono_modem *modem,
 
 void __ofono_atom_free(struct ofono_atom *atom);
 
-typedef void (*ofono_modemwatch_cb_t)(struct ofono_modem *modem,
-					gboolean added, void *data);
 void __ofono_modemwatch_init(void);
 void __ofono_modemwatch_cleanup(void);
 unsigned int __ofono_modemwatch_add(ofono_modemwatch_cb_t cb, void *user,
@@ -577,6 +575,9 @@ enum sms_class;
 
 typedef void (*sms_send_text_cb_t)(struct ofono_sms *sms,
 		const struct sms_address *addr, const char *text, void *data);
+typedef void (*sms_send_datagram_cb_t)(struct ofono_sms *sms,
+		const struct sms_address *addr, int dstport, int srcport,
+		unsigned char *bytes, unsigned int len, int flags, void *data);
 
 typedef void (*sms_dispatch_recv_text_cb_t)
 	(struct ofono_sms *sms, const struct ofono_uuid *uuid,
@@ -595,6 +596,11 @@ void __ofono_sms_filter_chain_free(struct sms_filter_chain *chain);
 void __ofono_sms_filter_chain_send_text(struct sms_filter_chain *chain,
 		const struct sms_address *addr, const char *text,
 		sms_send_text_cb_t sender, ofono_destroy_func destroy,
+		void *data);
+void __ofono_sms_filter_chain_send_datagram(struct sms_filter_chain *chain,
+		const struct sms_address *addr, int dstport, int srcport,
+		unsigned char *bytes, int len, int flags,
+		sms_send_datagram_cb_t sender, ofono_destroy_func destroy,
 		void *data);
 
 /* Does g_free(buf) when done */

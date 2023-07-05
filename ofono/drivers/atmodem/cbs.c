@@ -23,7 +23,6 @@
 #include <config.h>
 #endif
 
-#define _GNU_SOURCE
 #include <string.h>
 #include <stdio.h>
 
@@ -166,6 +165,7 @@ static void at_cbs_set_topics(struct ofono_cbs *cbs, const char *topics,
 	switch (data->vendor) {
 	case OFONO_VENDOR_GOBI:
 	case OFONO_VENDOR_QUALCOMM_MSM:
+	case OFONO_VENDOR_GEMALTO:
 		g_at_chat_send(data->chat, "AT+CSCB=0", none_prefix,
 				NULL, NULL, NULL);
 		break;
@@ -303,7 +303,7 @@ static void at_cbs_remove(struct ofono_cbs *cbs)
 	g_free(data);
 }
 
-static struct ofono_cbs_driver driver = {
+static const struct ofono_cbs_driver driver = {
 	.name = "atmodem",
 	.probe = at_cbs_probe,
 	.remove = at_cbs_remove,
