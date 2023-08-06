@@ -33,6 +33,7 @@ typedef struct cell_entry {
 
 typedef struct cell_info_dbus {
 	struct ofono_cell_info *info;
+	CellInfoControl *ctl;
 	DBusConnection *conn;
 	char *path;
 	gulong handler_id;
@@ -56,14 +57,19 @@ struct cell_property {
 	const char *name;
 	glong off;
 	int flag;
+	int type;
 };
 
 #define CELL_GSM_PROPERTY(value,name) \
-	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_gsm,name), value }
+	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_gsm,name), value, DBUS_TYPE_INT32 }
 #define CELL_WCDMA_PROPERTY(value,name) \
-	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_wcdma,name), value }
+	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_wcdma,name), value, DBUS_TYPE_INT32 }
 #define CELL_LTE_PROPERTY(value,name) \
-	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_lte,name), value }
+	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_lte,name), value, DBUS_TYPE_INT32 }
+#define CELL_NR_PROPERTY(value,name) \
+	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_nr,name), value, DBUS_TYPE_INT32 }
+#define CELL_NR_PROPERTY64(value,name) \
+	{ #name, G_STRUCT_OFFSET(struct ofono_cell_info_nr,name), value, DBUS_TYPE_INT64 }
 
 static const struct cell_property cell_gsm_properties [] = {
 	CELL_GSM_PROPERTY(0x001,mcc),
@@ -103,10 +109,31 @@ static const struct cell_property cell_lte_properties [] = {
 	CELL_LTE_PROPERTY(0x800,timingAdvance)
 };
 
+static const struct cell_property cell_nr_properties [] = {
+	CELL_NR_PROPERTY(0x001,mcc),
+	CELL_NR_PROPERTY(0x002,mnc),
+	CELL_NR_PROPERTY64(0x004,nci),
+	CELL_NR_PROPERTY(0x008,pci),
+	CELL_NR_PROPERTY(0x010,tac),
+	CELL_NR_PROPERTY(0x020,nrarfcn),
+	CELL_NR_PROPERTY(0x040,ssRsrp),
+	CELL_NR_PROPERTY(0x080,ssRsrq),
+	CELL_NR_PROPERTY(0x100,ssSinr),
+	CELL_NR_PROPERTY(0x200,csiRsrp),
+	CELL_NR_PROPERTY(0x400,csiRsrq),
+	CELL_NR_PROPERTY(0x800,csiSinr),
+};
+
 #define CELL_PROPERTY_REGISTERED 0x1000
 
 typedef void (*cell_info_dbus_append_fn)(DBusMessageIter *it,
 	const CellEntry *entry);
+
+static void cell_info_dbus_set_updates_enabled(CellInfoDBus *dbus, gboolean on)
+{
+	cell_info_control_set_enabled(dbus->ctl, dbus, on);
+	cell_info_control_set_update_interval(dbus->ctl, dbus, on ? 5000 : -1);
+}
 
 static const char *cell_info_dbus_cell_type_str(enum ofono_cell_type type)
 {
@@ -117,6 +144,8 @@ static const char *cell_info_dbus_cell_type_str(enum ofono_cell_type type)
 		return "wcdma";
 	case OFONO_CELL_TYPE_LTE:
 		return "lte";
+	case OFONO_CELL_TYPE_NR:
+		return "nr";
 	default:
 		return "unknown";
 	}
@@ -135,6 +164,9 @@ static const struct cell_property *cell_info_dbus_cell_properties
 	case OFONO_CELL_TYPE_LTE:
 		*count = G_N_ELEMENTS(cell_lte_properties);
 		return cell_lte_properties;
+	case OFONO_CELL_TYPE_NR:
+		*count = G_N_ELEMENTS(cell_nr_properties);
+		return cell_nr_properties;
 	default:
 		*count = 0;
 		return NULL;
@@ -195,10 +227,18 @@ static void cell_info_dbus_append_properties(DBusMessageIter *it,
 
 	dbus_message_iter_open_container(it, DBUS_TYPE_ARRAY, "{sv}", &dict);
 	for (i = 0; i < n; i++) {
-		gint32 value = G_STRUCT_MEMBER(int, &cell->info, prop[i].off);
-		if (value != OFONO_CELL_INVALID_VALUE) {
-			ofono_dbus_dict_append(&dict, prop[i].name,
-				DBUS_TYPE_INT32, &value);
+		if (prop[i].type == DBUS_TYPE_INT64) {
+			gint64 value = G_STRUCT_MEMBER(gint64, &cell->info, prop[i].off);
+			if (value != OFONO_CELL_INVALID_VALUE_INT64) {
+				ofono_dbus_dict_append(&dict, prop[i].name,
+					DBUS_TYPE_INT64, &value);
+			}
+		} else {
+			gint32 value = G_STRUCT_MEMBER(int, &cell->info, prop[i].off);
+			if (value != OFONO_CELL_INVALID_VALUE) {
+				ofono_dbus_dict_append(&dict, prop[i].name,
+					DBUS_TYPE_INT32, &value);
+			}
 		}
 	}
 	dbus_message_iter_close_container(it, &dict);
@@ -368,11 +408,20 @@ static int cell_info_dbus_compare(const struct ofono_cell *c1,
 
 		for (i = 0; i < n; i++) {
 			const glong offset = prop[i].off;
-			gint32 v1 = G_STRUCT_MEMBER(int, &c1->info, offset);
-			gint32 v2 = G_STRUCT_MEMBER(int, &c2->info, offset);
+			if (prop[i].type == DBUS_TYPE_INT64) {
+				gint64 v1 = G_STRUCT_MEMBER(gint64, &c1->info, offset);
+				gint64 v2 = G_STRUCT_MEMBER(gint64, &c2->info, offset);
 
-			if (v1 != v2) {
-				mask |= prop[i].flag;
+				if (v1 != v2) {
+					mask |= prop[i].flag;
+				}
+			} else  {
+				gint32 v1 = G_STRUCT_MEMBER(int, &c1->info, offset);
+				gint32 v2 = G_STRUCT_MEMBER(int, &c2->info, offset);
+
+				if (v1 != v2) {
+					mask |= prop[i].flag;
+				}
 			}
 		}
 
@@ -420,7 +469,7 @@ static void cell_info_dbus_property_changed(CellInfoDBus *dbus,
 			ofono_dbus_clients_signal_property_changed(
 				dbus->clients, entry->path,
 				CELL_DBUS_INTERFACE, prop[i].name,
-				DBUS_TYPE_INT32,
+				prop[i].type,
 				G_STRUCT_MEMBER_P(&cell->info, prop[i].off));
 			mask &= ~prop[i].flag;
 		}
@@ -539,7 +588,7 @@ static DBusMessage *cell_info_dbus_get_cells(DBusConnection *conn,
 		DBusMessageIter it, a;
 		GSList *l;
 
-		ofono_cell_info_set_enabled(dbus->info, TRUE);
+		cell_info_dbus_set_updates_enabled(dbus, TRUE);
 		dbus_message_iter_init_append(reply, &it);
 		dbus_message_iter_open_container(&it, DBUS_TYPE_ARRAY, "o", &a);
 		for (l = dbus->entries; l; l = l->next) {
@@ -567,7 +616,7 @@ static DBusMessage *cell_info_dbus_unsubscribe(DBusConnection *conn,
 			CELL_INFO_DBUS_UNSUBSCRIBED_SIGNAL);
 
 		if (!ofono_dbus_clients_count(dbus->clients)) {
-			ofono_cell_info_set_enabled(dbus->info, FALSE);
+			cell_info_dbus_set_updates_enabled(dbus, FALSE);
 		}
 		dbus_message_set_destination(signal, sender);
 		g_dbus_send_message(dbus->conn, signal);
@@ -600,20 +649,22 @@ static void cell_info_dbus_disconnect_cb(const char *name, void *data)
 	CellInfoDBus *dbus = data;
 
 	if (!ofono_dbus_clients_count(dbus->clients)) {
-		ofono_cell_info_set_enabled(dbus->info, FALSE);
+		cell_info_dbus_set_updates_enabled(dbus, FALSE);
 	}
 }
 
 CellInfoDBus *cell_info_dbus_new(struct ofono_modem *modem,
-	struct ofono_cell_info *info)
+	CellInfoControl *ctl)
 {
-	if (modem && info) {
+	if (modem && ctl && ctl->info) {
+		struct ofono_cell_info *info = ctl->info;
 		CellInfoDBus *dbus = g_new0(CellInfoDBus, 1);
 
 		DBG("%s", ofono_modem_get_path(modem));
 		dbus->path = g_strdup(ofono_modem_get_path(modem));
 		dbus->conn = dbus_connection_ref(ofono_dbus_get_connection());
 		dbus->info = ofono_cell_info_ref(info);
+		dbus->ctl = cell_info_control_ref(ctl);
 		dbus->handler_id = ofono_cell_info_add_change_handler(info,
 			cell_info_dbus_cells_changed_cb, dbus);
 
@@ -662,6 +713,9 @@ void cell_info_dbus_free(CellInfoDBus *dbus)
 
 		ofono_cell_info_remove_handler(dbus->info, dbus->handler_id);
 		ofono_cell_info_unref(dbus->info);
+
+		cell_info_control_drop_requests(dbus->ctl, dbus);
+		cell_info_control_unref(dbus->ctl);
 
 		g_free(dbus->path);
 		g_free(dbus);

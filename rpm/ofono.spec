@@ -1,44 +1,47 @@
 Name:       ofono
 Summary:    Open Source Telephony
-Version:    1.24
+Version:    1.29
 Release:    1
 License:    GPLv2
 URL:        https://github.com/sailfishos/ofono
 Source:     %{name}-%{version}.tar.bz2
 
-%define libgrilio_version 1.0.38
-%define libglibutil_version 1.0.30
-%define libmce_version 1.0.6
-%define libglibutil_version 1.0.49
+%define libglibutil_version 1.0.51
+
+# license macro requires rpm >= 4.11
+# Recommends requires rpm >= 4.12
+BuildRequires: pkgconfig(rpm)
+%define license_support %(pkg-config --exists 'rpm >= 4.11'; echo $?)
+%define can_recommend %(pkg-config --exists 'rpm >= 4.12'; echo $?)
+%if %{can_recommend} == 0
+%define recommend Recommends
+%else
+%define recommend Requires
+%endif
 
 Requires:   dbus
 Requires:   systemd
-Requires:   ofono-configs
 Requires:   libglibutil >= %{libglibutil_version}
-Requires:   libgrilio >= %{libgrilio_version}
-Requires:   libmce-glib >= %{libmce_version}
-Requires:   mobile-broadband-provider-info
+%{recommend}: mobile-broadband-provider-info
+%{recommend}: ofono-configs
 Requires(preun): systemd
 Requires(post): systemd
 Requires(postun): systemd
 
-# license macro requires reasonably fresh rpm
-BuildRequires:  rpm >= 4.11
+BuildRequires:  pkgconfig
 BuildRequires:  pkgconfig(dbus-1)
 BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(libudev) >= 145
 BuildRequires:  pkgconfig(libwspcodec) >= 2.0
 BuildRequires:  pkgconfig(libglibutil) >= %{libglibutil_version}
-BuildRequires:  pkgconfig(libgrilio) >= %{libgrilio_version}
-BuildRequires:  pkgconfig(libmce-glib) >= %{libmce_version}
 BuildRequires:  pkgconfig(libdbuslogserver-dbus)
 BuildRequires:  pkgconfig(libdbusaccess)
 BuildRequires:  pkgconfig(mobile-broadband-provider-info)
+BuildRequires:  pkgconfig(systemd)
 BuildRequires:  libtool
 BuildRequires:  automake
 BuildRequires:  autoconf
-BuildRequires:  systemd
 
 %description
 Telephony stack
@@ -61,13 +64,6 @@ Obsoletes:  ofono-test < 1.0
 %description tests
 Scripts for testing oFono and its functionality
 
-%package configs-mer
-Summary:    Package to provide default configs for ofono
-Provides:   ofono-configs
-
-%description configs-mer
-This package provides default configs for ofono
-
 %package doc
 Summary:   Documentation for %{name}
 Requires:  %{name} = %{version}-%{release}
@@ -89,14 +85,14 @@ autoreconf --force --install
     --enable-sailfish-debuglog \
     --enable-sailfish-provision \
     --enable-sailfish-pushforwarder \
-    --enable-sailfish-rilmodem \
     --enable-sailfish-access \
     --disable-add-remove-context \
+    --disable-rilmodem \
     --disable-isimodem \
     --disable-qmimodem \
     --with-systemdunitdir=%{_unitdir}
 
-%make_build
+make %{_smp_mflags}
 
 %check
 # run unit tests
@@ -135,7 +131,6 @@ systemctl try-restart ofono.service ||:
 
 %files
 %defattr(-,root,root,-)
-%license COPYING
 %config %{_sysconfdir}/dbus-1/system.d/*.conf
 %{_sbindir}/*
 %{_unitdir}/network.target.wants/ofono.service
@@ -145,6 +140,9 @@ systemctl try-restart ofono.service ||:
 # This file is part of phonesim and not needed with ofono.
 %exclude %{_sysconfdir}/ofono/phonesim.conf
 %dir %attr(775,radio,radio) /var/lib/ofono
+%if %{license_support} == 0
+%license COPYING
+%endif
 
 %files devel
 %defattr(-,root,root,-)
@@ -154,10 +152,6 @@ systemctl try-restart ofono.service ||:
 %files tests
 %defattr(-,root,root,-)
 %{_libdir}/%{name}/test/*
-
-%files configs-mer
-%defattr(-,root,root,-)
-%config /etc/ofono/ril_subscription.conf
 
 %files doc
 %defattr(-,root,root,-)

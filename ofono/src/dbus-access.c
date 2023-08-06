@@ -1,7 +1,7 @@
 /*
  *  oFono - Open Source Telephony
  *
- *  Copyright (C) 2019-2021 Jolla Ltd.
+ *  Copyright (C) 2019-2022 Jolla Ltd.
  *  Copyright (C) 2020 Open Mobile Platform LLC.
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -46,6 +46,8 @@ const char *ofono_dbus_access_intf_name(enum ofono_dbus_access_intf intf)
 		return OFONO_STK_INTERFACE;
 	case OFONO_DBUS_ACCESS_INTF_OEMRAW:
 		return "org.ofono.OemRaw";
+	case OFONO_DBUS_ACCESS_INTF_IMS:
+		return OFONO_IMS_INTERFACE;
 	case OFONO_DBUS_ACCESS_INTF_COUNT:
 		break;
 	}
@@ -68,6 +70,8 @@ const char *ofono_dbus_access_method_name(enum ofono_dbus_access_intf intf,
 		switch ((enum ofono_dbus_access_messagemgr_method)method) {
 		case OFONO_DBUS_ACCESS_MESSAGEMGR_SEND_MESSAGE:
 			return "SendMessage";
+		case OFONO_DBUS_ACCESS_MESSAGEMGR_SEND_DATA_MESSAGE:
+			return "SendDataMessage";
 		case OFONO_DBUS_ACCESS_MESSAGEMGR_METHOD_COUNT:
 			break;
 		}
@@ -183,6 +187,18 @@ const char *ofono_dbus_access_method_name(enum ofono_dbus_access_intf intf,
 		case OFONO_DBUS_ACCESS_OEMRAW_SEND:
 			return "Send";
 		case OFONO_DBUS_ACCESS_OEMRAW_METHOD_COUNT:
+			break;
+		}
+		break;
+	case OFONO_DBUS_ACCESS_INTF_IMS:
+		switch ((enum ofono_dbus_access_ims_method)method) {
+		case OFONO_DBUS_ACCESS_IMS_SET_PROPERTY:
+			return "SetProperty";
+		case OFONO_DBUS_ACCESS_IMS_REGISTER:
+			return "Register";
+		case OFONO_DBUS_ACCESS_IMS_UNREGISTER:
+			return "Unregister";
+		case OFONO_DBUS_ACCESS_IMS_METHOD_COUNT:
 			break;
 		}
 		break;

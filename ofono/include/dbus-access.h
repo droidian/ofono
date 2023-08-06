@@ -1,7 +1,7 @@
 /*
  *  oFono - Open Source Telephony
  *
- *  Copyright (C) 2019-2021 Jolla Ltd.
+ *  Copyright (C) 2019-2022 Jolla Ltd.
  *  Copyright (C) 2020 Open Mobile Platform LLC.
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -41,6 +41,8 @@ enum ofono_dbus_access_intf {
 	OFONO_DBUS_ACCESS_INTF_RADIOSETTINGS, /* org.ofono.RadioSettings */
 	OFONO_DBUS_ACCESS_INTF_STK,           /* org.ofono.SimToolkit */
 	OFONO_DBUS_ACCESS_INTF_OEMRAW,        /* org.ofono.OemRaw */
+	/* Since 1.29+git3 */
+	OFONO_DBUS_ACCESS_INTF_IMS,           /* org.ofono.IpMultimediaSystem */
 	OFONO_DBUS_ACCESS_INTF_COUNT
 };
 
@@ -53,6 +55,7 @@ enum ofono_dbus_access_message_method {
 /* OFONO_DBUS_ACCESS_INTF_MESSAGEMGR */
 enum ofono_dbus_access_messagemgr_method {
 	OFONO_DBUS_ACCESS_MESSAGEMGR_SEND_MESSAGE,
+	OFONO_DBUS_ACCESS_MESSAGEMGR_SEND_DATA_MESSAGE, /* Since 1.28+git5 */
 	OFONO_DBUS_ACCESS_MESSAGEMGR_METHOD_COUNT
 };
 
@@ -131,6 +134,15 @@ enum ofono_dbus_access_oemraw_method {
 	OFONO_DBUS_ACCESS_OEMRAW_METHOD_COUNT
 };
 
+/* OFONO_DBUS_ACCESS_INTF_IMS */
+enum ofono_dbus_access_ims_method {
+	/* Since 1.29+git3 */
+	OFONO_DBUS_ACCESS_IMS_SET_PROPERTY,
+	OFONO_DBUS_ACCESS_IMS_REGISTER,
+	OFONO_DBUS_ACCESS_IMS_UNREGISTER,
+	OFONO_DBUS_ACCESS_IMS_METHOD_COUNT
+};
+
 #define OFONO_DBUS_ACCESS_PRIORITY_LOW     (-100)
 #define OFONO_DBUS_ACCESS_PRIORITY_DEFAULT (0)
 #define OFONO_DBUS_ACCESS_PRIORITY_HIGH    (100)
@@ -158,7 +170,7 @@ const char *ofono_dbus_access_intf_name(enum ofono_dbus_access_intf intf);
 const char *ofono_dbus_access_method_name(enum ofono_dbus_access_intf intf,
 								int method);
 
-/* Since mer/1.24+git2 */
+/* Since 1.24+git2 */
 ofono_bool_t ofono_dbus_access_method_allowed(const char *sender,
 	enum ofono_dbus_access_intf iface, int method, const char *arg);
 

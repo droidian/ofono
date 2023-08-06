@@ -3,7 +3,7 @@
  *  oFono - Open Source Telephony
  *
  *  Copyright (C) 2008-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2015-2021  Jolla Ltd.
+ *  Copyright (C) 2015-2022  Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -424,7 +424,7 @@ int mmi_service_code_to_bearer_class(int code)
 }
 
 const char *ofono_phone_number_to_string(const struct ofono_phone_number *ph,
-			char buffer[/* OFONO_MAX_PHONE_NUMBER_BUFFER_SIZE */])
+			char buffer[/* OFONO_PHONE_NUMBER_BUFFER_SIZE */])
 {
 	if (ph->type == 145 && (strlen(ph->number) > 0) &&
 			ph->number[0] != '+') {
@@ -676,6 +676,10 @@ const char *registration_status_to_string(enum ofono_netreg_status status)
 		return "unknown";
 	case NETWORK_REGISTRATION_STATUS_ROAMING:
 		return "roaming";
+    case NETWORK_REGISTRATION_STATUS_REGISTERED_SMS_EUTRAN:
+		return "registered";
+	case NETWORK_REGISTRATION_STATUS_ROAMING_SMS_EUTRAN:
+		return "roaming";
 	case OFONO_NETREG_STATUS_NONE:
 		break;
 	}
@@ -702,8 +706,20 @@ const char *registration_tech_to_string(enum ofono_access_technology tech)
 		return "hspa";
 	case ACCESS_TECHNOLOGY_EUTRAN:
 		return "lte";
+	case ACCESS_TECHNOLOGY_NB_IOT_M1:
+		return "lte-cat-m1";
+	case ACCESS_TECHNOLOGY_NB_IOT_NB1:
+		return "lte-cat-nb1";
+	case ACCESS_TECHNOLOGY_EUTRA_5GCN:
+		return "lte";
+	case ACCESS_TECHNOLOGY_NR_5GCN:
+	case ACCESS_TECHNOLOGY_NG_RAN:
+	case ACCESS_TECHNOLOGY_EUTRA_NR:
+		return "nr";
 	case OFONO_ACCESS_TECHNOLOGY_NONE:
 		break;
+	default:
+		return "";
 	}
 	return "";
 }
@@ -786,4 +802,70 @@ const char *ofono_netreg_status_to_string(enum ofono_netreg_status status)
 const char *ofono_access_technology_to_string(enum ofono_access_technology tech)
 {
 	return registration_tech_to_string(tech);
+}
+
+const char *gprs_proto_to_string(enum ofono_gprs_proto proto)
+{
+	switch (proto) {
+	case OFONO_GPRS_PROTO_IP:
+		return "ip";
+	case OFONO_GPRS_PROTO_IPV6:
+		return "ipv6";
+	case OFONO_GPRS_PROTO_IPV4V6:
+		return "dual";
+	};
+
+	return NULL;
+}
+
+gboolean gprs_proto_from_string(const char *str, enum ofono_gprs_proto *proto)
+{
+	if (g_str_equal(str, "ip")) {
+		*proto = OFONO_GPRS_PROTO_IP;
+		return TRUE;
+	} else if (g_str_equal(str, "ipv6")) {
+		*proto = OFONO_GPRS_PROTO_IPV6;
+		return TRUE;
+	} else if (g_str_equal(str, "dual")) {
+		*proto = OFONO_GPRS_PROTO_IPV4V6;
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+const char *gprs_auth_method_to_string(enum ofono_gprs_auth_method auth)
+{
+	switch (auth) {
+	case OFONO_GPRS_AUTH_METHOD_CHAP:
+		return "chap";
+	case OFONO_GPRS_AUTH_METHOD_PAP:
+		return "pap";
+	case OFONO_GPRS_AUTH_METHOD_ANY:
+		return "any";
+	case OFONO_GPRS_AUTH_METHOD_NONE:
+		return "none";
+	};
+
+	return NULL;
+}
+
+gboolean gprs_auth_method_from_string(const char *str,
+					enum ofono_gprs_auth_method *auth)
+{
+	if (g_str_equal(str, "chap")) {
+		*auth = OFONO_GPRS_AUTH_METHOD_CHAP;
+		return TRUE;
+	} else if (g_str_equal(str, "pap")) {
+		*auth = OFONO_GPRS_AUTH_METHOD_PAP;
+		return TRUE;
+	} else if (g_str_equal(str, "any")) {
+		*auth = OFONO_GPRS_AUTH_METHOD_ANY;
+		return TRUE;
+	} else if (g_str_equal(str, "none")) {
+		*auth = OFONO_GPRS_AUTH_METHOD_NONE;
+		return TRUE;
+	}
+
+	return FALSE;
 }
