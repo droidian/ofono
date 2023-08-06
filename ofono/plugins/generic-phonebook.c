@@ -1,6 +1,6 @@
 /*
  *
- *  oFono - Open Source Telephony - RIL Modem Support
+ *  oFono - Open Source Telephony
  *
  *  Copyright (C) 2009 Nokia Corporation and/or its subsidiary(-ies).
  *  Copyright (C) ST-Ericsson SA 2010.
@@ -18,11 +18,16 @@
  *  GNU General Public License for more details.
  */
 
-#include "ril_plugin.h"
-
-#include <ofono/modem.h>
-#include <ofono/misc.h>
 #include <ofono/log.h>
+#include <ofono/misc.h>
+#include <ofono/modem.h>
+#include <ofono/phonebook.h>
+#include <ofono/plugin.h>
+#include <ofono/sim.h>
+
+#include <glib.h>
+#include <errno.h>
+#include <string.h>
 
 #define CALLBACK_WITH_FAILURE(cb, args...)		\
 	do {						\
@@ -178,29 +183,23 @@ static struct phonebook_entry *handle_adn(size_t len, const unsigned char *msg,
 	if (number_length != UNUSED && number_length != 0) {
 		number_length--;
 		/* '+' + number + terminator */
-		number = g_try_malloc0(2 * number_length + 2);
+		number = g_malloc0(2 * number_length + 2);
 
-		if (number) {
-			prefix = 0;
+		prefix = 0;
 
-			if ((msg[number_start + 1] & TON_MASK)
-					== TON_INTERNATIONAL) {
-				number[0] = '+';
-				prefix = 1;
-			}
-
-			for (i = 0; i < number_length; i++) {
-
-				number[2 * i + prefix] =
-					digit_to_utf8[msg[number_start + 2 + i]
-							& 0x0f];
-				number[2 * i + 1 + prefix] =
-					digit_to_utf8[msg[number_start + 2 + i]
-							>> 4];
-			}
-
-			extension_record = msg[len - 1];
+		if ((msg[number_start + 1] & TON_MASK) == TON_INTERNATIONAL) {
+			number[0] = '+';
+			prefix = 1;
 		}
+
+		for (i = 0; i < number_length; i++) {
+			number[2 * i + prefix] =
+				digit_to_utf8[msg[number_start + 2 + i] & 0x0f];
+			number[2 * i + 1 + prefix] =
+				digit_to_utf8[msg[number_start + 2 + i] >> 4];
+		}
+
+		extension_record = msg[len - 1];
 	}
 
 	DBG("ADN name %s, number %s ", name, number);
@@ -210,12 +209,7 @@ static struct phonebook_entry *handle_adn(size_t len, const unsigned char *msg,
 	if ((name == NULL || *name == '\0') && number == NULL)
 		goto end;
 
-	new_entry = g_try_malloc0(sizeof(*new_entry));
-	if (new_entry == NULL) {
-		ofono_error("%s: out of memory", __func__);
-		goto end;
-	}
-
+	new_entry = g_new0(struct phonebook_entry, 1);
 	new_entry->name = name;
 	new_entry->number = number;
 
@@ -225,11 +219,12 @@ static struct phonebook_entry *handle_adn(size_t len, const unsigned char *msg,
 	g_tree_insert(ref->phonebook, GINT_TO_POINTER(adn_idx), new_entry);
 
 	if (extension_record != UNUSED) {
-		struct record_to_read *ext_rec =
-			g_try_malloc0(sizeof(*ext_rec));
 		const struct pb_file_info *f_info = ext1_info(ref->pb_files);
 
-		if (ext_rec && f_info) {
+		if (f_info) {
+			struct record_to_read *ext_rec =
+				g_new0(struct record_to_read, 1);
+
 			ext_rec->file_id = f_info->file_id;
 			ext_rec->type_tag = TYPE_EXT1;
 			ext_rec->record_length = f_info->record_length;
@@ -267,11 +262,8 @@ static void handle_iap(size_t len, const unsigned char *msg,
 			}
 			if (msg[i] != UNUSED) {
 				struct record_to_read *new_rec =
-					g_try_malloc0(sizeof(*new_rec));
-				if (new_rec == NULL) {
-					ofono_error("%s: OOM", __func__);
-					return;
-				}
+					g_new0(struct record_to_read, 1);
+
 				DBG("type 0x%X record %d",
 					f_info->file_type, msg[i]);
 
@@ -354,9 +346,7 @@ static void handle_anr(size_t len,
 
 	number_length--;
 	/* '+' + number + terminator */
-	anr = g_try_malloc0(2 * number_length + 2);
-	if (anr == NULL)
-		return;
+	anr = g_malloc0(2 * number_length + 2);
 
 	prefix = 0;
 	if ((msg[2] & TON_MASK) == TON_INTERNATIONAL) {
@@ -392,11 +382,12 @@ static void handle_anr(size_t len,
 	DBG("extension_record %d aas %d", extension_record, aas_record);
 
 	if (extension_record != UNUSED) {
-		struct record_to_read *ext_rec =
-			g_try_malloc0(sizeof(*ext_rec));
 		const struct pb_file_info *f_info = ext1_info(ref->pb_files);
 
-		if (ext_rec && f_info) {
+		if (f_info) {
+			struct record_to_read *ext_rec =
+				g_new0(struct record_to_read, 1);
+
 			ext_rec->file_id = f_info->file_id;
 			ext_rec->type_tag = TYPE_EXT1;
 			ext_rec->record_length = f_info->record_length;
@@ -458,11 +449,12 @@ static void handle_ext1(size_t len, const unsigned char *msg,
 	/* Check if there is more extension data */
 	next_extension_record = msg[12];
 	if (next_extension_record != UNUSED) {
-		struct record_to_read *ext_rec =
-			g_try_malloc0(sizeof(*ext_rec));
 		const struct pb_file_info *f_info = ext1_info(ref->pb_files);
 
-		if (ext_rec && f_info) {
+		if (f_info) {
+			struct record_to_read *ext_rec =
+				g_new0(struct record_to_read, 1);
+
 			DBG("next_extension_record %d", next_extension_record);
 
 			ext_rec->file_id = f_info->file_id;
@@ -483,9 +475,7 @@ static void handle_ext1(size_t len, const unsigned char *msg,
 	}
 
 	number_length = msg[1];
-	ext_number = g_try_malloc0(2 * number_length + 1);
-	if (ext_number == NULL)
-		return;
+	ext_number = g_malloc0(2 * number_length + 1);
 
 	for (i = 0; i < number_length; i++) {
 		ext_number[2 * i] = digit_to_utf8[msg[2 + i] & 0x0f];
@@ -720,13 +710,11 @@ static void pb_adn_cb(int ok, int total_length, int record,
 		/* Add type 1 records */
 		for (l = ref->pb_files; l; l = l->next) {
 			const struct pb_file_info *f_info = l->data;
-			struct record_to_read *ext_rec;
 
 			if (f_info->pbr_type == TYPE_1_TAG &&
 					f_info->file_type != TYPE_ADN) {
-				ext_rec = g_try_malloc0(sizeof(*ext_rec));
-				if (ext_rec == NULL)
-					break;
+				struct record_to_read *ext_rec =
+					g_new0(struct record_to_read, 1);
 
 				ext_rec->file_id = f_info->file_id;
 				ext_rec->type_tag = f_info->file_type;
@@ -820,36 +808,18 @@ static void start_sim_app_read(struct ofono_phonebook *pb)
 	pbd->df_path = sim_path;
 	pbd->df_size = sizeof(sim_path);
 
-	ref_rec = g_try_malloc0(sizeof(*ref_rec));
-	if (ref_rec == NULL) {
-		ofono_error("%s: OOM", __func__);
-		export_and_return(pb, FALSE);
-		return;
-	}
-
+	ref_rec = g_new0(struct pb_ref_rec, 1);
 	ref_rec->phonebook = g_tree_new(comp_int);
 
 	/* Only EF_ADN and EF_EXT1 read for SIM */
 
-	f_info = g_try_malloc0(sizeof(*f_info));
-	if (f_info == NULL) {
-		ofono_error("%s: OOM", __func__);
-		export_and_return(pb, FALSE);
-		return;
-	}
-
+	f_info = g_new0(struct pb_file_info, 1);
 	f_info->file_id = SIM_EFADN_FILEID;
 	f_info->pbr_type = TYPE_1_TAG;
 	f_info->file_type = TYPE_ADN;
 	ref_rec->pb_files = g_slist_append(ref_rec->pb_files, f_info);
 
-	f_ext1 = g_try_malloc0(sizeof(*f_ext1));
-	if (f_ext1 == NULL) {
-		ofono_error("%s: OOM", __func__);
-		export_and_return(pb, FALSE);
-		return;
-	}
-
+	f_ext1 = g_new0(struct pb_file_info, 1);
 	f_ext1->file_id = SIM_EFEXT1_FILEID;
 	f_ext1->pbr_type = TYPE_3_TAG;
 	f_ext1->file_type = TYPE_EXT1;
@@ -887,13 +857,7 @@ static void pb_reference_data_cb(int ok, int total_length, int record,
 		return;
 	}
 
-	ref_rec = g_try_malloc0(sizeof(*ref_rec));
-	if (ref_rec == NULL) {
-		ofono_error("%s: OOM", __func__);
-		export_and_return(pb, FALSE);
-		return;
-	}
-
+	ref_rec = g_new0(struct pb_ref_rec, 1);
 	ref_rec->phonebook = g_tree_new(comp_int);
 
 	while (ptr < sdata + record_length && finished == FALSE) {
@@ -911,12 +875,7 @@ static void pb_reference_data_cb(int ok, int total_length, int record,
 
 			while (i < typelen) {
 				struct pb_file_info *file_info =
-					g_try_new0(struct pb_file_info, 1);
-				if (!file_info) {
-					ofono_error("%s: OOM", __func__);
-					export_and_return(pb, FALSE);
-					return;
-				}
+					g_new0(struct pb_file_info, 1);
 
 				file_id = (ptr[i + 2] << 8) + ptr[i + 3];
 
@@ -972,7 +931,7 @@ static void pb_reference_data_cb(int ok, int total_length, int record,
 	}
 }
 
-static void ril_export_entries(struct ofono_phonebook *pb,
+static void export_entries(struct ofono_phonebook *pb,
 				const char *storage,
 				ofono_phonebook_cb_t cb, void *data)
 {
@@ -999,7 +958,7 @@ static void ril_export_entries(struct ofono_phonebook *pb,
 			pb_reference_data_cb, pb);
 }
 
-static gboolean ril_delayed_register(gpointer user_data)
+static gboolean delayed_register(gpointer user_data)
 {
 	struct ofono_phonebook *pb = user_data;
 	struct pb_data *pbd = ofono_phonebook_get_data(pb);
@@ -1009,13 +968,11 @@ static gboolean ril_delayed_register(gpointer user_data)
 	return FALSE;
 }
 
-static int ril_phonebook_probe(struct ofono_phonebook *pb,
+static int phonebook_probe(struct ofono_phonebook *pb,
 				unsigned int vendor, void *user)
 {
-	struct ofono_modem *modem = ((struct ril_modem *)user)->ofono;
-	struct pb_data *pd = g_try_new0(struct pb_data, 1);
-	if (pd == NULL)
-		return -ENOMEM;
+	struct ofono_modem *modem = user;
+	struct pb_data *pd = g_new0(struct pb_data, 1);
 
 	pd->sim = ofono_modem_get_sim(modem);
 	if (pd->sim == NULL)
@@ -1027,12 +984,12 @@ static int ril_phonebook_probe(struct ofono_phonebook *pb,
 
 	ofono_phonebook_set_data(pb, pd);
 
-	pd->register_id = g_idle_add(ril_delayed_register, pb);
+	pd->register_id = g_idle_add(delayed_register, pb);
 
 	return 0;
 }
 
-static void ril_phonebook_remove(struct ofono_phonebook *pb)
+static void phonebook_remove(struct ofono_phonebook *pb)
 {
 	struct pb_data *pbd = ofono_phonebook_get_data(pb);
 
@@ -1047,12 +1004,26 @@ static void ril_phonebook_remove(struct ofono_phonebook *pb)
 	g_free(pbd);
 }
 
-const struct ofono_phonebook_driver ril_phonebook_driver = {
-	.name		= RILMODEM_DRIVER,
-	.probe		= ril_phonebook_probe,
-	.remove		= ril_phonebook_remove,
-	.export_entries	= ril_export_entries
+static const struct ofono_phonebook_driver phonebook_driver = {
+	.name		= "generic",
+	.probe		= phonebook_probe,
+	.remove		= phonebook_remove,
+	.export_entries	= export_entries
 };
+
+static int phonebook_init(void)
+{
+	return ofono_phonebook_driver_register(&phonebook_driver);
+}
+
+static void phonebook_exit(void)
+{
+	ofono_phonebook_driver_unregister(&phonebook_driver);
+}
+
+OFONO_PLUGIN_DEFINE(generic_phonebook, "Generic Phonebook Plugin",
+	OFONO_VERSION, OFONO_PLUGIN_PRIORITY_DEFAULT,
+	phonebook_init, phonebook_exit)
 
 /*
  * Local Variables:

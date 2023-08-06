@@ -3,7 +3,7 @@
  *  oFono - Open Source Telephony
  *
  *  Copyright (C) 2008-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2015-2021  Jolla Ltd.
+ *  Copyright (C) 2015-2022  Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -138,6 +138,10 @@ typedef void (*ofono_sim_close_channel_cb_t)(const struct ofono_error *error,
 typedef void (*ofono_sim_logical_access_cb_t)(const struct ofono_error *error,
 		const unsigned char *resp, unsigned int len, void *data);
 
+typedef void (*ofono_sim_set_active_card_slot_cb_t)(
+					const struct ofono_error *error,
+					void *data);
+
 struct ofono_sim_driver {
 	const char *name;
 	int (*probe)(struct ofono_sim *sim, unsigned int vendor, void *data);
@@ -211,14 +215,22 @@ struct ofono_sim_driver {
 	void (*logical_access)(struct ofono_sim *sim, int session_id,
 			const unsigned char *pdu, unsigned int len,
 			ofono_sim_logical_access_cb_t cb, void *data);
-	/* Since mer/1.23+git28 */
+	/* API version 1 (since 1.23+git28) */
 	void (*open_channel2)(struct ofono_sim *sim, const unsigned char *aid,
 			unsigned int len, ofono_sim_open_channel_cb_t cb,
 			void *data);
+	/* API version 2 (since 1.29+git1) */
+	void (*set_active_card_slot)(struct ofono_sim *sim, unsigned int index,
+			ofono_sim_set_active_card_slot_cb_t cb, void *data);
 };
 
 int ofono_sim_driver_register(const struct ofono_sim_driver *d);
 void ofono_sim_driver_unregister(const struct ofono_sim_driver *d);
+
+#define OFONO_SIM_DRIVER_API_VERSION 2
+#define ofono_sim_driver_register(d) /* Since 1.28+git4 */ \
+	ofono_sim_driver_register_version(d, OFONO_SIM_DRIVER_API_VERSION)
+int ofono_sim_driver_register_version(const struct ofono_sim_driver *d, int v);
 
 struct ofono_sim *ofono_sim_create(struct ofono_modem *modem,
 					unsigned int vendor,
@@ -229,6 +241,9 @@ void ofono_sim_remove(struct ofono_sim *sim);
 
 void ofono_sim_set_data(struct ofono_sim *sim, void *data);
 void *ofono_sim_get_data(struct ofono_sim *sim);
+void ofono_sim_set_card_slot_count(struct ofono_sim *sim, unsigned int val);
+void ofono_sim_set_active_card_slot(struct ofono_sim *sim,
+					unsigned int val);
 
 const char *ofono_sim_get_imsi(struct ofono_sim *sim);
 const char *ofono_sim_get_mcc(struct ofono_sim *sim);
@@ -241,8 +256,8 @@ const unsigned char *ofono_sim_get_cphs_service_table(struct ofono_sim *sim);
 
 enum ofono_sim_password_type ofono_sim_get_password_type(struct ofono_sim *sim);
 
-void ofono_sim_refresh_full(struct ofono_sim *sim); /* Since mer/1.24+git2 */
-enum ofono_sim_password_type ofono_sim_puk2pin( /* Since mer/1.24+git2 */
+void ofono_sim_refresh_full(struct ofono_sim *sim); /* Since 1.24+git2 */
+enum ofono_sim_password_type ofono_sim_puk2pin( /* Since 1.24+git2 */
 					enum ofono_sim_password_type type);
 
 unsigned int ofono_sim_add_state_watch(struct ofono_sim *sim,

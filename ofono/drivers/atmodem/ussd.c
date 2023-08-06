@@ -23,7 +23,6 @@
 #include <config.h>
 #endif
 
-#define _GNU_SOURCE
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -92,7 +91,7 @@ static const unsigned char *ucs2_gsm_to_packed(const char *content,
 		return NULL;
 	}
 
-	packed = pack_7bit_own_buf(gsm, written, 0, TRUE, msg_len, 0, msg);
+	packed = pack_7bit_own_buf(gsm, written, 0, true, msg_len, 0, msg);
 	g_free(gsm);
 
 	return packed;
@@ -137,7 +136,7 @@ static void cusd_parse(GAtResult *result, struct ofono_ussd *ussd)
 		switch (data->charset) {
 		case AT_UTIL_CHARSET_GSM:
 			msg_ptr = pack_7bit_own_buf((const guint8 *) content,
-							-1, 0, TRUE, &msg_len,
+							-1, 0, true, &msg_len,
 							0, msg);
 			break;
 
@@ -201,7 +200,7 @@ static void at_ussd_request(struct ofono_ussd *ussd, int dcs,
 		unsigned char unpacked_buf[182];
 		long written;
 
-		unpack_7bit_own_buf(pdu, len, 0, TRUE, sizeof(unpacked_buf),
+		unpack_7bit_own_buf(pdu, len, 0, true, sizeof(unpacked_buf),
 					&written, 0, unpacked_buf);
 
 		if (written < 1)
@@ -327,7 +326,7 @@ static void at_ussd_remove(struct ofono_ussd *ussd)
 	g_free(data);
 }
 
-static struct ofono_ussd_driver driver = {
+static const struct ofono_ussd_driver driver = {
 	.name		= "atmodem",
 	.probe		= at_ussd_probe,
 	.remove		= at_ussd_remove,

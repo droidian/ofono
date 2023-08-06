@@ -23,6 +23,7 @@
 #include <ofono/types.h>
 
 #define CBS_MAX_GSM_CHARS 93
+#define CBS_MAX_TOPIC 9999
 #define SMS_MSGID_LEN 20
 
 enum sms_type {
@@ -161,6 +162,16 @@ enum sms_alphabet {
 	SMS_ALPHABET_TURKISH,
 	SMS_ALPHABET_SPANISH,
 	SMS_ALPHABET_PORTUGUESE,
+	SMS_ALPHABET_BENGALI,
+	SMS_ALPHABET_GUJARATI,
+	SMS_ALPHABET_HINDI,
+	SMS_ALPHABET_KANNADA,
+	SMS_ALPHABET_MALAYALAM,
+	SMS_ALPHABET_ORIYA,
+	SMS_ALPHABET_PUNJABI,
+	SMS_ALPHABET_TAMIL,
+	SMS_ALPHABET_TELUGU,
+	SMS_ALPHABET_URDU,
 };
 
 enum sms_mwi_type {
@@ -217,6 +228,12 @@ enum cbs_geo_scope {
 	CBS_GEO_SCOPE_PLMN,
 	CBS_GEO_SCOPE_SERVICE_AREA,
 	CBS_GEO_SCOPE_CELL_NORMAL
+};
+
+enum sms_datagram_endianess {
+	SMS_DATAGRAM_ENDIANESS_GSM,
+	SMS_DATAGRAM_ENDIANESS_BIG_ENDIAN,
+	SMS_DATAGRAM_ENDIANESS_LITTLE_ENDIAN
 };
 
 struct sms_address {
@@ -563,6 +580,14 @@ GSList *sms_datagram_prepare(const char *to,
 				unsigned short src, unsigned short dst,
 				gboolean use_16bit_port,
 				gboolean use_delivery_reports);
+
+GSList *sms_datagram_prepare_with_endianess(const char *to,
+				const unsigned char *data, unsigned int len,
+				guint16 ref, gboolean use_16bit_ref,
+				unsigned short src, unsigned short dst,
+				gboolean use_16bit_port,
+				gboolean use_delivery_reports,
+				enum sms_datagram_endianess endianess);
 
 gboolean cbs_dcs_decode(guint8 dcs, gboolean *udhi, enum sms_class *cls,
 			enum sms_charset *charset, gboolean *compressed,

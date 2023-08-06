@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT(ofono, 1.24)
+AC_INIT(ofono, 1.29)
 
 AM_INIT_AUTOMAKE([foreign subdir-objects color-tests])
 AC_CONFIG_HEADERS(config.h)
@@ -55,9 +55,6 @@ AC_ARG_ENABLE(pie, AC_HELP_STRING([--enable-pie],
 	fi
 ])
 
-AC_ARG_ENABLE(threads, AC_HELP_STRING([--enable-threads],
-		[enable threading support]), [enable_threads=${enableval}])
-
 AC_CHECK_FUNC(signalfd, dummy=yes,
 			AC_MSG_ERROR(signalfd support is required))
 
@@ -78,14 +75,6 @@ PKG_CHECK_MODULES(GIO, gio-2.0, dummy=yes,
 				AC_MSG_ERROR(GIO is required))
 GLIB_CFLAGS="$GLIB_CFLAGS $GIO_CFLAGS"
 GLIB_LIBS="$GLIB_LIBS $GIO_LIBS"
-
-if (test "${enable_threads}" = "yes"); then
-	AC_DEFINE(NEED_THREADS, 1, [Define if threading support is required])
-	PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
-				AC_MSG_ERROR(GThread >= 2.16 is required))
-	GLIB_CFLAGS="$GLIB_CFLAGS $GTHREAD_CFLAGS"
-	GLIB_LIBS="$GLIB_LIBS $GTHREAD_LIBS"
-fi
 
 PKG_CHECK_MODULES(DBUS, dbus-1 >= 1.4, dummy=yes,
 				AC_MSG_ERROR(D-Bus >= 1.4 is required))
@@ -177,32 +166,16 @@ AC_ARG_ENABLE(rilmodem, AC_HELP_STRING([--disable-rilmodem],
                                         [enable_rilmodem=${enableval}])
 AM_CONDITIONAL(RILMODEM, test "${enable_rilmodem}" != "no")
 
-AC_ARG_ENABLE(sailfish-rilmodem, AC_HELP_STRING([--enable-sailfish-rilmodem],
-				[enable Sailfish RIL modem]),
-				[enable_sailfish_rilmodem=${enableval}],
-				[enable_sailfish_rilmodem="no"])
-AM_CONDITIONAL(SAILFISH_RILMODEM, test "${enable_sailfish_rilmodem}" != "no")
+AC_ARG_ENABLE(extra-modems,
+		AC_HELP_STRING([--enable-extra-modems],
+			[enable modems not used by Sailfish OS]),
+					[enable_extra_modems=${enableval}])
+AM_CONDITIONAL(EXTRA_MODEMS, test "${enable_extra_modems}" = "yes")
 
-PKG_CHECK_MODULES(GLIBUTIL, libglibutil >= 1.0.49, dummy=yes,
-			AC_MSG_ERROR(libglibutil >= 1.0.49 is required))
+PKG_CHECK_MODULES(GLIBUTIL, libglibutil >= 1.0.51, dummy=yes,
+			AC_MSG_ERROR(libglibutil >= 1.0.51 is required))
 CFLAGS="$CFLAGS $GLIBUTIL_CFLAGS"
 LIBS="$LIBS $GLIBUTIL_LIBS"
-
-if (test "${enable_sailfish_rilmodem}" = "yes"); then
-	PKG_CHECK_MODULES(GRILIO, libgrilio >= 1.0.38, dummy=yes,
-				AC_MSG_ERROR(libgrilio >= 1.0.38 is required))
-	PKG_CHECK_MODULES(LIBMCE, libmce-glib >= 1.0.6, dummy=yes,
-				AC_MSG_ERROR(libmce-glib >= 1.0.6 is required))
-	CFLAGS="$CFLAGS $GRILIO_CFLAGS $LIBMCE_CFLAGS"
-	LIBS="$LIBS $GRILIO_LIBS $LIBMCE_LIBS"
-	enable_sailfish_manager=yes
-fi
-
-AC_ARG_ENABLE(sailfish-manager,
-		AC_HELP_STRING([--enable-sailfish-manager],
-			[enable Sailfish OS modem manager plugin]),
-					[enable_sailfish_manager=${enableval}])
-AM_CONDITIONAL(SAILFISH_MANAGER, test "${enable_sailfish_manager}" = "yes")
 
 PKG_CHECK_MODULES(DBUS_GLIB, dbus-glib-1, dummy=yes,
 		AC_MSG_ERROR(dbus-glib is required by unit tests))

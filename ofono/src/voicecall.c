@@ -1738,11 +1738,7 @@ static int voicecall_dial(struct ofono_voicecall *vc, const char *number,
 
 	string_to_phone_number(number, &ph);
 
-	/* No filtering for emergency calls */
-	if (is_emergency_number(vc, number))
-		vc->driver->dial(vc, &ph, clir, cb, vc);
-	else
-		dial_filter(vc, &ph, clir, cb, vc);
+	dial_filter(vc, &ph, clir, cb, vc);
 
 	return 0;
 }
@@ -2669,9 +2665,9 @@ void ofono_voicecall_disconnected(struct ofono_voicecall *vc, int id,
 	if (l) {
 		/* Incoming call was disconnected in the process of being
 		 * filtered. voicecall_destroy cancels it. */
+		voicecall_destroy(l->data);
 		vc->incoming_filter_list = g_slist_delete_link
 					(vc->incoming_filter_list, l);
-		voicecall_destroy(l->data);
 		return;
 	}
 
@@ -4262,14 +4258,10 @@ static void dial_request(struct ofono_voicecall *vc)
 		struct ofono_modem *modem = __ofono_atom_get_modem(vc->atom);
 
 		__ofono_modem_inc_emergency_mode(modem);
-
-		/* No filtering for emergency calls */
-		vc->driver->dial(vc, &vc->dial_req->ph,
-			OFONO_CLIR_OPTION_DEFAULT, dial_request_cb, vc);
-	} else {
-		dial_filter(vc, &vc->dial_req->ph, OFONO_CLIR_OPTION_DEFAULT,
-				dial_request_cb, vc);
 	}
+
+	dial_filter(vc, &vc->dial_req->ph, OFONO_CLIR_OPTION_DEFAULT,
+					dial_request_cb, vc);
 }
 
 static void dial_req_disconnect_cb(const struct ofono_error *error, void *data)
@@ -4662,4 +4654,11 @@ void ofono_voicecall_ssn_mo_notify(struct ofono_voicecall *vc,
 		ssn_mo_forwarded_notify(vc, id, code);
 		break;
 	}
+}
+
+/* Since mer/1.27+git3 */
+ofono_bool_t ofono_voicecall_is_emergency_number(struct ofono_voicecall *vc,
+							const char *number)
+{
+	return vc && number && is_emergency_number(vc, number);
 }

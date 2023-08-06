@@ -23,7 +23,6 @@
 #include <config.h>
 #endif
 
-#define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -422,8 +421,6 @@ static struct ofono_modem_driver mbim_driver = {
 
 static int mbim_init(void)
 {
-	l_debug("------------------->Foobar");
-
 	return ofono_modem_driver_register(&mbim_driver);
 }
 
