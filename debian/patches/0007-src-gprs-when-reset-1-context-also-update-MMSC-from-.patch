@@ -1,0 +1,42 @@
+From: =?utf-8?q?Jos=C3=A9_Pekkarinen?= <jose.pekkarinen@foxhound.fi>
+Date: Wed, 19 Mar 2014 16:57:05 -0400
+Subject: src/gprs: when reset 1 context,
+ also update MMSC from provisioning data
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+[ratchanan@ubports.com: extract from José's original, write the patch
+description.
+
+Also note that this patch patches the part specific to Sailfish OS's
+fork of oFono.
+]
+---
+ ofono/src/gprs.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/ofono/src/gprs.c b/ofono/src/gprs.c
+index 8b896fd..22caeb4 100644
+--- a/ofono/src/gprs.c
++++ b/ofono/src/gprs.c
+@@ -921,7 +921,8 @@ static void pri_reset_context_properties(struct pri_context *ctx,
+ 			gprs_auth_method_to_string(ctx->context.auth_method));
+ 	}
+ 
+-	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
++	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
++		ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+ 		if (pri_str_update(ctx->message_proxy, ap->message_proxy,
+ 				sizeof(ctx->message_proxy))) {
+ 			changed = TRUE;
+@@ -987,7 +988,8 @@ static gboolean pri_deactivation_required(struct pri_context *ctx,
+ 	if (pri_str_changed(ctx->context.password, ap->password))
+ 		return TRUE;
+ 
+-	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS) {
++	if (ap->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
++		ap->type == OFONO_GPRS_CONTEXT_TYPE_INTERNET) {
+ 		if (pri_str_changed(ctx->message_proxy, ap->message_proxy))
+ 			return TRUE;
+ 

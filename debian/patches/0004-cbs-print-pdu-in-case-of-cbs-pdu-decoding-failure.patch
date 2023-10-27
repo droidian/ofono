@@ -1,0 +1,17 @@
+Index: ofono/src/cbs.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/ofono/src/cbs.c b/ofono/src/cbs.c
+--- a/ofono/src/cbs.c	(revision 4ae4d688cef73a07e35685a0cea47ea441bcc57a)
++++ b/ofono/src/cbs.c	(date 1681457581881)
+@@ -187,7 +187,7 @@
+ 		return;
+ 
+ 	if (!cbs_decode(pdu, pdu_len, &c)) {
+-		ofono_error("Unable to decode CBS PDU");
++		ofono_error("Unable to decode CBS PDU %s", pdu);
+ 		return;
+ 	}
+ 

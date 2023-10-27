@@ -1,0 +1,26 @@
+From: Jussi Kangas <jussi.kangas@tieto.com>
+Date: Fri, 29 Aug 2014 11:23:30 +0300
+Subject: src: allow MessageCenter/Proxy for TYPE_INTERNET and TYPE_MMS
+
+Client must be able to modify all properties that are specified
+as modifiable in gprs interface specification.
+---
+ ofono/src/gprs.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/ofono/src/gprs.c b/ofono/src/gprs.c
+index 22caeb4..8211dd5 100644
+--- a/ofono/src/gprs.c
++++ b/ofono/src/gprs.c
+@@ -1756,8 +1756,9 @@ static DBusMessage *pri_set_property(DBusConnection *conn,
+ 		return pri_set_auth_method(ctx, conn, msg, str);
+ 	}
+ 
+-	if (ctx->type != OFONO_GPRS_CONTEXT_TYPE_MMS ||
+-		ctx->type != OFONO_GPRS_CONTEXT_TYPE_INTERNET)
++	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_ANY ||
++		ctx->type == OFONO_GPRS_CONTEXT_TYPE_WAP ||
++		ctx->type == OFONO_GPRS_CONTEXT_TYPE_IMS)
+ 		return __ofono_error_invalid_args(msg);
+ 
+ 	if (!strcmp(property, "MessageProxy")) {

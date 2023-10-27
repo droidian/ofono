@@ -1,0 +1,38 @@
+From: =?utf-8?q?Jos=C3=A9_Pekkarinen?= <jose.pekkarinen@foxhound.fi>
+Date: Wed, 19 Mar 2014 16:57:05 -0400
+Subject: src/gprs: also set up IP route for TYPE_INTERNET when there's an
+ MMSC
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+[ratchanan@ubports.com: extract from José's original patch, write the
+ patch description.]
+---
+ ofono/src/gprs.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/ofono/src/gprs.c b/ofono/src/gprs.c
+index f1c2719..8b896fd 100644
+--- a/ofono/src/gprs.c
++++ b/ofono/src/gprs.c
+@@ -831,7 +831,8 @@ static void pri_update_mms_context_settings(struct pri_context *ctx)
+ 
+ 	DBG("proxy %s port %u", ctx->proxy_host, ctx->proxy_port);
+ 
+-	pri_set_ipv4_addr(gc->interface, settings->ipv4->ip);
++	if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS)
++		pri_set_ipv4_addr(gc->interface, settings->ipv4->ip);
+ 
+ 	if (ctx->proxy_host)
+ 		pri_setproxy(gc->interface, ctx->proxy_host);
+@@ -1162,7 +1163,8 @@ static void pri_activate_callback(const struct ofono_error *error, void *data)
+ 	if (gc->interface != NULL) {
+ 		pri_ifupdown(gc->interface, TRUE);
+ 
+-		if (ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS &&
++		if ((ctx->type == OFONO_GPRS_CONTEXT_TYPE_MMS ||
++			(ctx->message_proxy && strlen(ctx->message_proxy) > 0)) &&
+ 				gc->settings->ipv4)
+ 			pri_update_mms_context_settings(ctx);
+ 

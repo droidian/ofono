@@ -1,0 +1,9 @@
+0001-gprs-Add-Preferred-property-to-contexts.patch
+0002-ofono-mbpi-default-to-IPv4-during-context-provisioni.patch
+0003-simfs-null-data.patch
+0004-cbs-print-pdu-in-case-of-cbs-pdu-decoding-failure.patch
+0005-src-allow-MessageCenter-Proxy-for-TYPE_INTERNET.patch
+0006-src-gprs-also-set-up-IP-route-for-TYPE_INTERNET-when.patch
+0007-src-gprs-when-reset-1-context-also-update-MMSC-from-.patch
+0008-src-allow-MessageCenter-Proxy-for-TYPE_INTERNET-and-.patch
+0009-src-fix-combined-gprs-context-property-logic.patch
