@@ -2,4 +2,4 @@ debian/tmp/etc/dbus-1/system.d/*
 debian/tmp/usr/sbin/ofonod
 debian/tmp/etc/ofono
 debian/tmp/usr/share/man
-debian/tmp/lib/systemd/system/
+debian/tmp/usr/lib/systemd/system/

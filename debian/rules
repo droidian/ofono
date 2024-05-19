@@ -18,7 +18,7 @@ CONFIGURE_FLAGS := \
     --disable-add-remove-context \
     --disable-isimodem \
     --disable-qmimodem \
-    --with-systemdunitdir=/lib/systemd/system
+    --with-systemdunitdir=/usr/lib/systemd/system
 
 %:
 	dh $@ --with=autoreconf,systemd --sourcedirectory=ofono
