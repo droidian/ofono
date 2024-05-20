@@ -15,6 +15,8 @@
 
 #include "drivers/ril/ril_util.h"
 
+#include "ofono.h"
+
 #include <ofono/netreg.h>
 
 #define RIL_PROTO_IP_STR "IP"
