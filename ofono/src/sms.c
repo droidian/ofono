@@ -3,7 +3,7 @@
  *  oFono - Open Source Telephony
  *
  *  Copyright (C) 2008-2011  Intel Corporation. All rights reserved.
- *  Copyright (C) 2015-2021 Jolla Ltd.
+ *  Copyright (C) 2015-2022 Jolla Ltd.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License version 2 as
@@ -173,6 +173,26 @@ static const char *sms_alphabet_to_string(enum sms_alphabet alphabet)
 		return "spanish";
 	case SMS_ALPHABET_PORTUGUESE:
 		return "portuguese";
+	case SMS_ALPHABET_BENGALI:
+		return "bengali";
+	case SMS_ALPHABET_GUJARATI:
+        return "gujarati";
+	case SMS_ALPHABET_HINDI:
+		return "hindi";
+	case SMS_ALPHABET_KANNADA:
+		return "kannada";
+	case SMS_ALPHABET_MALAYALAM:
+		return "malayalam";
+	case SMS_ALPHABET_ORIYA:
+		return "oriya";
+	case SMS_ALPHABET_PUNJABI:
+		return "punjabi";
+	case SMS_ALPHABET_TAMIL:
+		return "tamil";
+	case SMS_ALPHABET_TELUGU:
+		return "telugu";
+	case SMS_ALPHABET_URDU:
+		return "urdu";
 	case SMS_ALPHABET_DEFAULT:
 		return "default";
 	}
@@ -191,6 +211,26 @@ static gboolean sms_alphabet_from_string(const char *str,
 		*alphabet = SMS_ALPHABET_SPANISH;
 	else if (g_str_equal(str, "portuguese"))
 		*alphabet = SMS_ALPHABET_PORTUGUESE;
+	else if (g_str_equal(str, "bengali"))
+        *alphabet = SMS_ALPHABET_BENGALI;
+	else if (g_str_equal(str, "gujarati"))
+         *alphabet = SMS_ALPHABET_GUJARATI;
+	else if (g_str_equal(str, "hindi"))
+		*alphabet = SMS_ALPHABET_HINDI;
+	else if (g_str_equal(str, "kannada"))
+		*alphabet = SMS_ALPHABET_KANNADA;
+	else if (g_str_equal(str, "malayalam"))
+		*alphabet = SMS_ALPHABET_MALAYALAM;
+	else if (g_str_equal(str, "oriya"))
+		*alphabet = SMS_ALPHABET_ORIYA;
+	else if (g_str_equal(str, "punjabi"))
+		*alphabet = SMS_ALPHABET_PUNJABI;
+	else if (g_str_equal(str, "tamil"))
+		*alphabet = SMS_ALPHABET_TAMIL;
+	else if (g_str_equal(str, "telugu"))
+		*alphabet = SMS_ALPHABET_TELUGU;
+	else if (g_str_equal(str, "urdu"))
+		*alphabet = SMS_ALPHABET_URDU;
 	else
 		return FALSE;
 
@@ -795,6 +835,8 @@ static void netreg_status_watch(int status, int lac, int ci, int tech,
 	switch (status) {
 	case NETWORK_REGISTRATION_STATUS_REGISTERED:
 	case NETWORK_REGISTRATION_STATUS_ROAMING:
+	case NETWORK_REGISTRATION_STATUS_REGISTERED_SMS_EUTRAN:
+	case NETWORK_REGISTRATION_STATUS_ROAMING_SMS_EUTRAN:
 		sms->registered = TRUE;
 		break;
 	default:
@@ -1001,6 +1043,64 @@ static void sms_send_message_submit(struct ofono_sms *sms,
 	message->pending = NULL;
 }
 
+static void sms_send_data_message_submit(struct ofono_sms *sms,
+			const struct sms_address *addr, int dstport,
+			int srcport, unsigned char *bytes, unsigned int len,
+			int flags, void *data)
+{
+	struct sms_message_data *message = data;
+	const char *to = sms_address_to_string(addr);
+	GSList *msg_list = NULL;
+	gboolean use_16bit_ref = FALSE;
+	gboolean use_delivery_reports;
+	int err;
+	struct ofono_uuid uuid;
+	enum ofono_sms_submit_flag submit_flags;
+	enum sms_datagram_endianess endianess = SMS_DATAGRAM_ENDIANESS_GSM;
+
+	if (bytes == NULL) {
+		__ofono_dbus_pending_reply(&message->pending,
+				__ofono_error_invalid_format(message->pending));
+		return;
+	}
+
+	if (flags & OFONO_SMS_DATA_FLAG_USE_LITTLE_ENDIAN)
+		endianess = SMS_DATAGRAM_ENDIANESS_LITTLE_ENDIAN;
+
+	use_delivery_reports = flags & OFONO_SMS_DATA_FLAG_DELIVERY_REPORT;
+	msg_list = sms_datagram_prepare_with_endianess(to, bytes, len, sms->ref,
+					use_16bit_ref, srcport, dstport, TRUE,
+					use_delivery_reports, endianess);
+
+	if (msg_list == NULL) {
+		__ofono_dbus_pending_reply(&message->pending,
+			__ofono_error_invalid_format(message->pending));
+		return;
+	}
+
+	submit_flags = OFONO_SMS_SUBMIT_FLAG_RETRY;
+	submit_flags |= OFONO_SMS_SUBMIT_FLAG_EXPOSE_DBUS;
+
+	if (use_delivery_reports)
+		submit_flags |= OFONO_SMS_SUBMIT_FLAG_REQUEST_SR;
+
+	err = __ofono_sms_txq_submit(sms, msg_list, submit_flags, &uuid,
+					message_queued, message->pending);
+
+	g_slist_free_full(msg_list, g_free);
+
+	if (err < 0) {
+		__ofono_dbus_pending_reply(&message->pending,
+				__ofono_error_failed(message->pending));
+		return;
+	}
+
+	/* Ownership has been transfered to the message queue */
+	message->pending = NULL;
+
+	DBG("SMS data sent");
+}
+
 static void sms_send_message_destroy(void *data)
 {
 	struct sms_message_data *message = data;
@@ -1053,6 +1153,49 @@ static DBusMessage *sms_send_message(DBusConnection *conn, DBusMessage *msg,
 	sms_address_from_string(&addr, to);
 	__ofono_sms_filter_chain_send_text(sms->filter_chain, &addr, text,
 		sms_send_message_submit, sms_send_message_destroy, message);
+
+	return NULL;
+}
+
+static DBusMessage *sms_send_data_message(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	struct ofono_sms *sms = data;
+	const char *to;
+	unsigned char *bytes = NULL;
+	struct sms_message_data *message;
+	struct sms_address addr;
+	dbus_int32_t srcport;
+	dbus_int32_t dstport;
+	dbus_uint32_t flags;
+	int len;
+
+	if (!ofono_dbus_access_method_allowed(dbus_message_get_sender(msg),
+			OFONO_DBUS_ACCESS_INTF_MESSAGEMGR,
+			OFONO_DBUS_ACCESS_MESSAGEMGR_SEND_DATA_MESSAGE, NULL))
+		return __ofono_error_access_denied(msg);
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_STRING, &to,
+					DBUS_TYPE_ARRAY, DBUS_TYPE_BYTE,
+					&bytes, &len,
+					DBUS_TYPE_INT32, &srcport,
+					DBUS_TYPE_INT32, &dstport,
+					DBUS_TYPE_UINT32, &flags,
+					DBUS_TYPE_INVALID))
+		return __ofono_error_invalid_args(msg);
+
+	if (valid_phone_number_format(to) == FALSE)
+		return __ofono_error_invalid_format(msg);
+
+	message = g_new0(struct sms_message_data, 1);
+	message->pending = dbus_message_ref(msg);
+
+	sms_address_from_string(&addr, to);
+	__ofono_sms_filter_chain_send_datagram(sms->filter_chain, &addr,
+					dstport, srcport, bytes, len, flags,
+					sms_send_data_message_submit,
+					sms_send_message_destroy, message);
+
 
 	return NULL;
 }
@@ -1174,6 +1317,15 @@ static const GDBusMethodTable sms_manager_methods[] = {
 			GDBUS_ARGS({ "to", "s" }, { "text", "s" }),
 			GDBUS_ARGS({ "path", "o" }),
 			sms_send_message) },
+	{ GDBUS_ASYNC_METHOD("SendDataMessage",
+			GDBUS_ARGS(
+				{ "to", "s" },
+				{ "data", "ay" },
+				{ "srcport", "i"},
+				{ "dstport", "i"},
+				{ "flags", "u"}),
+			GDBUS_ARGS({ "path", "o" }),
+			sms_send_data_message) },
 	{ GDBUS_METHOD("GetMessages",
 			NULL, GDBUS_ARGS({ "messages", "a(oa{sv})" }),
 			sms_get_messages) },

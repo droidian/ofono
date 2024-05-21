@@ -25,7 +25,6 @@
 #include <config.h>
 #endif
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,7 +37,9 @@
 #include <ofono/call-forwarding.h>
 #include "common.h"
 
+#if __GNUC__ > 7
 #pragma GCC diagnostic ignored "-Wrestrict"
+#endif
 
 #include "gril.h"
 
@@ -377,7 +378,7 @@ static void ril_call_forwarding_remove(struct ofono_call_forwarding *cf)
 	g_free(data);
 }
 
-static struct ofono_call_forwarding_driver driver = {
+static const struct ofono_call_forwarding_driver driver = {
 	.name			= RILMODEM,
 	.probe			= ril_call_forwarding_probe,
 	.remove			= ril_call_forwarding_remove,
