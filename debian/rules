@@ -11,13 +11,13 @@ CFLAGS += -Wall \
 CONFIGURE_FLAGS := \
     --disable-static \
     --enable-sailfish-bt \
-    --enable-sailfish-manager \
     --enable-sailfish-provision \
     --enable-sailfish-pushforwarder \
     --disable-rilmodem \
     --disable-add-remove-context \
     --disable-isimodem \
     --disable-qmimodem \
+    --disable-upower \
     --with-systemdunitdir=/usr/lib/systemd/system
 
 %:
