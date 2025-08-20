@@ -583,10 +583,6 @@ builtin_sources += plugins/sailfish_bt.c
 endif
 endif
 
-if UPOWER
-builtin_modules += upower
-builtin_sources += plugins/upower.c
-endif
 endif
 
 if NETTIME
